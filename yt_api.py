@@ -1,6 +1,7 @@
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 import os
+import yt_dlp
 load_dotenv()
 
 api_key = os.getenv('API_KEY')
@@ -40,6 +41,7 @@ while request:
     response = request.execute()
 
     for item in response.get('items', []):
+        url = 'youtube.com/watch?v=' + item['snippet']['resourceId']['videoId']
         video_title = item['snippet']['title']
         video_description = item['snippet']['description']
         v_idx = video_description.find('v.')
@@ -64,4 +66,8 @@ while request:
             continue
         else:
             title_description_dict[video_title] = video_description
+    with yt_dlp.YoutubeDL() as ydl:
+        ydl.download(url)
+    print(video_title, video_description, url)
+    break
     request = youtube.playlistItems().list_next(request, response)
