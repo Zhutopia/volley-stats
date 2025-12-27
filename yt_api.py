@@ -74,14 +74,24 @@ def download_video(url):
     video_url = url
 
     try:
-        yt = YouTube(video_url)
-        video_stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        yt_file = YouTube(video_url)
+        def get_resolution(s):
+            return int(s.resolution[:-1])
+        video_stream = max(
+            filter(lambda s: get_resolution(s) <= 1080,
+                   filter(lambda s: s.type == 'video', yt_file.fmt_streams)),
+                   key=get_resolution
+        )
+        
+        #yt = YouTube(video_url)
+        #video_stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
 
         if video_stream:
-            print(f'Video found: {yt.title}')
-            print(f'Downloading video at {video_stream.resolution} resolution...')
+            #print(f'Video found: {yt.title}')
+            #print(f'Downloading video at {video_stream.resolution} resolution...')
 
-            video_stream.download(filename='test_full_game.mp4')
+            #video_stream.download(filename='test_full_game.mp4')
+            video_stream.download(filename='test_full_game_1080p.mp4')
             print('Download complete!')
         else:
             print('No suitable progressive MP4 stream found.')
@@ -100,4 +110,4 @@ def clip_video(input_file, start_time, end_time, output_file):
         print(f"An error occurred: {e}")
 
 download_video('https://www.youtube.com/watch?v=wltzN9fDBo8')
-clip_video('test_full_game.mp4',240,300,'test_min4-5.mp4')
+clip_video('test_full_game_1080p.mp4',276,290,'test_276-290_1080p.mp4')
