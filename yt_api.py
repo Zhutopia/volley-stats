@@ -2,6 +2,7 @@ from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from pytubefix import YouTube
 import os
+from moviepy import VideoFileClip
 load_dotenv()
 
 api_key = os.getenv('API_KEY')
@@ -69,7 +70,7 @@ def get_videos():
         request = youtube.playlistItems().list_next(request, response)
 
 def download_video(url):
-    video_url = 'https://www.youtube.com/watch?v=wltzN9fDBo8'
+    video_url = url
 
     try:
         yt = YouTube(video_url)
@@ -79,9 +80,23 @@ def download_video(url):
             print(f'Video found: {yt.title}')
             print(f'Downloading video at {video_stream.resolution} resolution...')
 
-            video_stream.download()
+            video_stream.download(filename='test_full_game.mp4')
             print('Download complete!')
         else:
             print('No suitable progressive MP4 stream found.')
     except Exception as e:
         print(f'An error occurred: {e}')
+
+def clip_video(input_file, start_time, end_time, output_file):
+    try:
+        with VideoFileClip(input_file) as video:
+            # Get the subclip
+            clip = video.subclipped(start_time, end_time)
+            # Write the result to a file
+            clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
+        print(f"Successfully created clip: {output_file}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+download_video('https://www.youtube.com/watch?v=wltzN9fDBo8')
+clip_video('test_full_game.mp4',240,300,'test_min4-5.mp4')
