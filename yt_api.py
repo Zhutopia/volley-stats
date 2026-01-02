@@ -2,7 +2,7 @@ from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from pytubefix import YouTube
 import os
-import yt_dlp
+import cv2
 from moviepy import VideoFileClip
 load_dotenv()
 
@@ -74,7 +74,7 @@ def download_video(url):
     video_url = url
 
     try:
-        yt_file = YouTube(video_url)
+        yt_file = YouTube(video_url, use_po_token=True)
         def get_resolution(s):
             return int(s.resolution[:-1])
         video_stream = max(
@@ -91,7 +91,7 @@ def download_video(url):
             #print(f'Downloading video at {video_stream.resolution} resolution...')
 
             #video_stream.download(filename='test_full_game.mp4')
-            video_stream.download(filename='test_full_game_1080p.mp4')
+            video_stream.download(filename='input_videos\\Rob_Ros_Liam_Zhu.mp4')#os.path.join(os.getcwd(), 'input_videos\\Rob_Ros_Liam_Zhu.mp4'))
             print('Download complete!')
         else:
             print('No suitable progressive MP4 stream found.')
@@ -109,5 +109,52 @@ def clip_video(input_file, start_time, end_time, output_file):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-download_video('https://www.youtube.com/watch?v=wltzN9fDBo8')
-clip_video('test_full_game_1080p.mp4',276,290,'test_276-290_1080p.mp4')
+def extract_periodic_frame(video_path, output_folder, interval_seconds=5):
+    """
+    Extracts a specific frame from a video and saves it as a high-resolution image.
+
+    Args:
+        video_path (str): Path to the input video file.
+        frame_number (int): The index of the frame to extract (0-based).
+        output_path (str): Path to save the output image file (e.g., 'snapshot.png').
+    """
+    # Open the video file
+    vidcap = cv2.VideoCapture(video_path)
+    
+    # Check if video opened successfully
+    if not vidcap.isOpened():
+        print("Error: Could not open video file.")
+        return
+
+    fps = vidcap.get(cv2.CAP_PROP_FPS)
+    interval_frames = int(fps * interval_seconds)
+
+    os.makedirs(output_folder, exist_ok=True)
+    frame_count = 0
+    saved_count = 0
+
+    while True:
+        ret, frame = vidcap.read()
+        if not ret:
+            break
+
+        if frame_count % interval_frames == 0:
+            timestamp = int(frame_count / fps)
+            filename = os.path.join(output_folder, f'snapshot_{timestamp}s.png')
+            cv2.imwrite(filename, frame)
+            saved_count += 1
+            print(f"Saved snapshot at {timestamp}s to {filename}")
+        
+        frame_count += 1
+    vidcap.release()
+    print(f"Done. Extracted {saved_count} snapshots.")
+
+# Example usage:
+video_file = 'input_videos/test_full_game_1080p.mp4' 
+output_image_folder = 'images/Colan_Rob_Jordan_Stanley'
+frame_to_capture = 379 # Change this to the desired frame number
+
+extract_periodic_frame(video_file, output_image_folder)
+cwd = os.getcwd()
+#download_video('https://www.youtube.com/watch?v=1RrhWKeGDRQ')
+#clip_video(os.path.join(cwd, 'input_videos\\Rob_Ros_Liam_Zhu.mp4'),90,330,os.path.join(cwd, 'input_videos\\Rob_Ros_Liam_Zhu_90-330.mp4'))
