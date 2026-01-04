@@ -1,6 +1,7 @@
 .env
 *.mp4
 *.pt
+*.ipynb
 *.webm
 *.avi
 *.png

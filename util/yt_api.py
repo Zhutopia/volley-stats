@@ -5,19 +5,7 @@ import os
 import cv2
 from moviepy import VideoFileClip
 load_dotenv()
-
 api_key = os.getenv('API_KEY')
-
-class Match:
-    def __init__(self, player1, player2, player3, player4):
-        self.player1 = player1
-        self.player2 = player2
-        self.player3 = player3
-        self.player4 = player4
-
-    def __str__(self):
-        return f'{self.player1} and {self.player2} vs {self.player3} and {self.player4}'
-
 
 def get_videos():
     youtube = build('youtube', 'v3', developerKey=api_key)
@@ -54,8 +42,7 @@ def get_videos():
                 player2 = team1.split('/')[1]
                 player3 = team2.split('/')[0]
                 player4 = team2.split('/')[1]
-                match = Match(player1,player2,player3,player4)
-                #print(match)
+                
             except:
                 print('ISSUE PROCESSING')
                 print(video_title,video_description)
