@@ -3,3 +3,7 @@
 *.pt
 *.webm
 *.avi
+*.png
+*.mkv
+images/*
+videos/*
