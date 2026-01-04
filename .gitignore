@@ -8,3 +8,4 @@
 *.mkv
 images/*
 videos/*
+__pycache__/
