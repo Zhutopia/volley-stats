@@ -13,7 +13,8 @@ Need a YouTube API Key and .env file setup
 Run main.py with arguments for execution of different modes
 
 ```bash
-py main.py -m mode ...
+py main.py...
+    -m, --mode        -  Mode to run in: download, process, analyze, report
     -f, --filename    -  File name the downloaded YouTube video will be named as
     -l, --link        -  Link to YouTube video to be downloaded. Videos will be placed into a "videos" directory
     -w, --work_dir    -  Working directory for input files
