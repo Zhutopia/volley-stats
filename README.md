@@ -7,7 +7,7 @@ pip install:
 - google-api-python-client
 - ...
 
-YouTube API Key
+Need a YouTube API Key and .env file setup
 
 ## Getting Started
 Run main.py with arguments for execution of different modes
@@ -26,3 +26,15 @@ py main.py -m mode ...
 Currently only able to:
 - download video given the -f and -l arguments and save it into the videos directory
 - analyze video given the -v argument. results will show up under a runs directory
+
+In runs/detects/test is a test_clip.avi showing 
+
+Future Plans:
+- Split player and ball detector
+- optimize models for
+- look into optimizing resources for performing jobs
+- migrate to google colab... AWS equivalent?
+- Detect unique players
+- Understand events through the course of a match
+- Develop metrics from sets of volleyball games
+- Investigate player mechanics and personalized stats
