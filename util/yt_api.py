@@ -6,6 +6,7 @@ import cv2
 from moviepy import VideoFileClip
 load_dotenv()
 api_key = os.getenv('API_KEY')
+PROJ_DIR = "C:/Users/bzhu2/git_projects/volley-stats/"
 
 def get_videos():
     youtube = build('youtube', 'v3', developerKey=api_key)
@@ -57,14 +58,14 @@ def get_videos():
                 title_description_dict[video_title] = video_description
         request = youtube.playlistItems().list_next(request, response)
 
-def download_video(url):
+def download_video(url, file_name):
     video_url = url
-
+    
     try:
-        yt_file = YouTube(video_url, use_po_token=True)
+        yt_file = YouTube(video_url)#, use_po_token=True)
         def get_resolution(s):
             return int(s.resolution[:-1])
-        video_stream = max(
+        video_stream = max( # TODO: figure out exactly how this works... download as mp4 and highest res
             filter(lambda s: get_resolution(s) <= 1080,
                    filter(lambda s: s.type == 'video', yt_file.fmt_streams)),
                    key=get_resolution
@@ -76,14 +77,14 @@ def download_video(url):
         if video_stream:
             #print(f'Video found: {yt.title}')
             #print(f'Downloading video at {video_stream.resolution} resolution...')
-
-            #video_stream.download(filename='test_full_game.mp4')
-            video_stream.download(filename='input_videos\\Rob_Ros_Liam_Zhu.mp4')#os.path.join(os.getcwd(), 'input_videos\\Rob_Ros_Liam_Zhu.mp4'))
+            video_stream.download(output_path=os.path.join(PROJ_DIR, "videos"), filename=file_name)
             print('Download complete!')
         else:
             print('No suitable progressive MP4 stream found.')
     except Exception as e:
         print(f'An error occurred: {e}')
+    
+    return True
 
 def clip_video(input_file, start_time, end_time, output_file):
     try:
@@ -137,11 +138,11 @@ def extract_periodic_frame(video_path, output_folder, interval_seconds=5):
     print(f"Done. Extracted {saved_count} snapshots.")
 
 # Example usage:
-video_file = 'input_videos/test_full_game_1080p.mp4' 
-output_image_folder = 'images/Colan_Rob_Jordan_Stanley'
-frame_to_capture = 379 # Change this to the desired frame number
+#video_file = 'input_videos/test_full_game_1080p.mp4' 
+#output_image_folder = 'images/Colan_Rob_Jordan_Stanley'
+#frame_to_capture = 379 # Change this to the desired frame number
 
-extract_periodic_frame(video_file, output_image_folder,10)
-cwd = os.getcwd()
+#extract_periodic_frame(video_file, output_image_folder,10)
+#cwd = os.getcwd()
 #download_video('https://www.youtube.com/watch?v=1RrhWKeGDRQ')
 #clip_video(os.path.join(cwd, 'input_videos\\Rob_Ros_Liam_Zhu.mp4'),90,330,os.path.join(cwd, 'input_videos\\Rob_Ros_Liam_Zhu_90-330.mp4'))
