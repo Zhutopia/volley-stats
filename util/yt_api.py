@@ -3,38 +3,71 @@ from dotenv import load_dotenv
 from pytubefix import YouTube
 import os
 import cv2
+import pandas as pd
 from moviepy import VideoFileClip
+from datetime import datetime
+from collections import defaultdict
 load_dotenv()
-api_key = os.getenv('API_KEY')
+API_KEY = os.getenv('API_KEY')
 PROJ_DIR = "C:/Users/bzhu2/git_projects/volley-stats/"
 
-def get_videos():
-    youtube = build('youtube', 'v3', developerKey=api_key)
+def get_videos(handle_str):
+    youtube = build('youtube', 'v3', developerKey=API_KEY)
 
+    # Get list from the channel object (?)
     request = youtube.channels().list(
         part='contentDetails',
-        forHandle='robwilson6755'
+        forHandle=handle_str
         )
-
     response = request.execute()
-
+    
+    # Get uploads from the channel
     uploads = response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
 
+    # Get video items from playlist
     request = youtube.playlistItems().list(
         part='snippet',
         playlistId=uploads,
         maxResults=50
         )
 
-    title_description_dict = {}
-    player_dict = {}
+    previous_games = None
+    game_counter = 1
+    yt_uids = None
+    new_entries = defaultdict(list)
+    skipped_counter = 0
+    skipped_entries = defaultdict(list)
 
-    while request:
-        response = request.execute()
-
-        for item in response.get('items', []):
-            video_title = item['snippet']['title']
+    # if util/games.csv exists, there are previous games that were already gathered
+    if os.path.exists('stats/games.csv'):
+        previous_games = pd.read_csv('stats/games.csv')
+        yt_uids = set(previous_games['yt_uid']) # create a set out of the yt_uids
+        
+    while request: # While there are more videos to look at from the channel
+        response = request.execute() # Get list of video items
+        for item in response.get('items', []): # iterate through list of items
+            yt_video_id = item['id']
+            if previous_games: # If game was previously seen, skip it
+                if len(previous_games['yt_uid']) > 0:
+                    if yt_video_id in yt_uids:
+                        print(f'Already logged {item['snippet']['title']}')
+                        continue
+            yt_video_url = 'youtube.com/watch?v=' + item['snippet']['resourceId']['videoId']
+            game_id = game_counter
+            game_counter += 1
+            #upload_datetime = datetime.fromisoformat(item['snippet']['publishedAt'])
+            game_date_str = item['snippet']['title'].split()[0]
             video_description = item['snippet']['description']
+            try:
+                game_month, game_day, game_year = game_date_str.split('.')
+            except:
+                print(f'ISSUE PROCESSING TITLE FOR {item['snippet']['title']}... SKIPPED')
+                skipped_entries['yt_video_url'].append(yt_video_url)
+                skipped_entries['title'].append(item['snippet']['title'])
+                skipped_entries['description'].append(video_description)
+                skipped_counter += 1
+                continue
+            
             v_idx = video_description.find('v.')
             team1 = video_description[:v_idx-1]
             team2 = video_description[v_idx+3:]
@@ -43,20 +76,33 @@ def get_videos():
                 player2 = team1.split('/')[1]
                 player3 = team2.split('/')[0]
                 player4 = team2.split('/')[1]
-                
+                new_entries['game_id'].append(game_id)
+                new_entries['title'].append(item['snippet']['title'])
+                new_entries['description'].append(video_description)
+                new_entries['player1'].append(player1)
+                new_entries['player2'].append(player2)
+                new_entries['player3'].append(player3)
+                new_entries['player4'].append(player4)
+                new_entries['score'].append('?')
+                new_entries['downloaded'].append(0)
+                new_entries['link'].append(yt_video_url)  
+                new_entries['yt_uid'].append(yt_video_id)
             except:
-                print('ISSUE PROCESSING')
-                print(video_title,video_description)
+                print(f'ISSUE PROCESSING DESCRIPTION FOR {item['snippet']['title']}... SKIPPED')
+                skipped_entries['yt_video_url'].append(yt_video_url)
+                skipped_entries['title'].append(item['snippet']['title'])
+                skipped_entries['description'].append(video_description)
+                skipped_counter += 1
                 continue
-            if video_title in title_description_dict:
-                '''print('ERROR')
-                print('OLD: ',video_title, title_description_dict[video_title])
-                print('NEW: ', video_title, video_description)
-                print(video_title, video_description)'''
-                continue
-            else:
-                title_description_dict[video_title] = video_description
         request = youtube.playlistItems().list_next(request, response)
+    df = pd.DataFrame(new_entries)
+    skipped_df = pd.DataFrame(skipped_entries)
+    skipped_df.to_csv('skipped_games.csv', mode='w', index=False, header=True)
+    if previous_games:
+        df.to_csv('games.csv', mode='a', index=False, header=False)
+    else:
+        df.to_csv('games.csv', mode='w', index=False, header=True)
+    print(f'Added {len(new_entries['game_id'])} new entries to games.csv. Skipped {skipped_counter} videos')
 
 def download_video(url, file_name):
     video_url = url
