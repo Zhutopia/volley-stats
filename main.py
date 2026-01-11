@@ -28,6 +28,7 @@ def main():
     parser.add_argument('-o','--output_path', required=False, help="Output path for processed files")
     parser.add_argument('-f','--file_name', required=False, help="File name")
     parser.add_argument('-v','--video_path', required=False, help="Path to video file for analysis")
+    parser.add_argument('-u','--user', required=False, help="User handle for the channel you want to use videos from")
     args = parser.parse_args()
 
     # TODO: HELP MESSAGE
@@ -52,6 +53,9 @@ def main():
             return
     elif args.mode == 'report':
         print("Generating report...")
+    elif args.mode == 'gather':
+        print(f"Gathering all videos from {args.user}")
+        yt_api.get_videos(args.user)
     else:
         print("Invalid mode selected. Please choose from: download, process, analyze, report.")
     print("Program finished.")
