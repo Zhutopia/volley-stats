@@ -12,6 +12,15 @@ def download_video(youtube_link, file_name):
         print("Failed to download video.")
         return
     
+def get_videos(user_handle):
+    csv_file = user_handle + '.csv'
+    videos, skipped = yt_api.get_videos(user_handle)
+    videos.to_csv#TODO: track videos gathered per user
+    #if not os.path.exists(csv_file):
+    #    with open(csv_file, 'w') as f:
+    #        videos = yt_api.get_videos(user_handle)
+            
+    
 def analyze_video(video_path):
     print(f"Analyzing video at {video_path}...")
     yolo_api.run_yolo_inference(video_path)
@@ -22,7 +31,7 @@ def main():
     parser  = argparse.ArgumentParser(prog='Volley-Stat',
                                       description="Convert volleyball matches to statistics")
     #parser.add_argument('-h', '--help', required=False, help="Show help message and exit")
-    parser.add_argument('-m', '--mode', required=True, help="Mode to run: download, process, analyze, report")
+    parser.add_argument('-m', '--mode', required=True, help="Mode to run: download, process, analyze, report, gather")
     parser.add_argument('-l','--link', required=False, help="YouTube link for downloading video")
     parser.add_argument('-w','--work_dir', required=False, help="Working directory for input files")
     parser.add_argument('-o','--output_path', required=False, help="Output path for processed files")
@@ -55,7 +64,7 @@ def main():
         print("Generating report...")
     elif args.mode == 'gather':
         print(f"Gathering all videos from {args.user}")
-        yt_api.get_videos(args.user)
+        get_videos(args.user)
     else:
         print("Invalid mode selected. Please choose from: download, process, analyze, report.")
     print("Program finished.")

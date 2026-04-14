@@ -5,7 +5,16 @@ pip install:
 - ultralytics
 - pytubefix
 - google-api-python-client
+- python-dotenv
+- opencv-python
+- pandas
 - ...
+
+Set up .env file with YouTube API key:
+Create a .env file in the same directory as main.py. Create YouTube API Key (link?) through the Google Cloud Console. Copy key from APIs and Services -> Credentials paste it into this line to add to the .env file: YOUTUBE_API_KEY="<paste-key-here>"
+
+How to setup youtube token?
+gcloud auth?
 
 Need a YouTube API Key and .env file setup
 
