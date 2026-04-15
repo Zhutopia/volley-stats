@@ -2,16 +2,15 @@ from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from pytubefix import YouTube
 import os
-import cv2
 import pandas as pd
-from moviepy import VideoFileClip
-from datetime import datetime
 from collections import defaultdict
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
-PROJ_DIR = "C:/Users/bzhu2/git_projects/volley-stats/"
+PROJ_DIR = "C:/Users/bzhu2/github_projects/volley-stats/"
 
 def get_videos(handle_str):
+    # Given a youtube channel handle, get all videos from the channel and add to games.csv if not already present.
+    # If there are issues processing the title or description, log the video url, title, and description to skipped_games.csv for manual review.
     youtube = build('youtube', 'v3', developerKey=API_KEY)
 
     # Get list from the channel object (?)
@@ -105,83 +104,137 @@ def get_videos(handle_str):
     print(f'Added {len(new_entries['game_id'])} new entries to games.csv. Skipped {skipped_counter} videos')
 
 def download_video(url, file_name):
-    video_url = url
+    video_url = url if url.startswith('http') else f'https://{url}'
+
+    videos_dir = os.path.join(PROJ_DIR, "videos") # TODO: make this more robust to different environments
+    os.makedirs(videos_dir, exist_ok=True)
+    
     
     try:
-        yt_file = YouTube(video_url)#, use_po_token=True)
-        def get_resolution(s):
-            return int(s.resolution[:-1])
-        video_stream = max( # TODO: figure out exactly how this works... download as mp4 and highest res
-            filter(lambda s: get_resolution(s) <= 1080,
-                   filter(lambda s: s.type == 'video', yt_file.fmt_streams)),
-                   key=get_resolution
-        )
+        yt_file = YouTube(video_url, use_po_token=True)
+        streams = getattr(yt_file, 'streams', None) or getattr(yt_file, 'fmt_streams', None)
         
-        #yt = YouTube(video_url)
-        #video_stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        folder_name = file_name.rsplit('.', 1)[0]
+        out_dir = os.path.join(videos_dir, folder_name)
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, file_name)
 
-        if video_stream:
-            #print(f'Video found: {yt.title}')
-            #print(f'Downloading video at {video_stream.resolution} resolution...')
-            video_stream.download(output_path=os.path.join(PROJ_DIR, "videos"), filename=file_name)
-            print('Download complete!')
-        else:
-            print('No suitable progressive MP4 stream found.')
+        def res_int(s):
+            r = getattr(s, 'resolution', None)
+            if not r:
+                return 0
+            if isinstance(r, str) and r.endswith('p'):
+                try:
+                    return int(r[:-1])
+                except Exception:
+                    return 0
+            return 0
+
+        # 1) Try to find a progressive MP4 (contains audio) at 1080p
+        prog_stream = None
+        try:
+            if getattr(yt_file, 'streams', None):
+                # pytube API
+                prog_qs = yt_file.streams.filter(progressive=True, file_extension='mp4')
+                prog_stream = max(prog_qs, key=res_int) if prog_qs else None
+            else:
+                # fmt_streams fallback
+                candidates = [s for s in streams if getattr(s, 'type', None) == 'video' and getattr(s, 'audio_codec', None)]
+                prog_stream = max(candidates, key=res_int) if candidates else None
+        except Exception:
+            prog_stream = None
+
+        # If we found a progressive MP4 at or above 1080, download and return
+        if prog_stream and res_int(prog_stream) >= 1080:
+            out_path = os.path.join(out_dir, file_name)
+            prog_stream.download(output_path=out_dir, filename=file_name)
+            print(f'Download complete: {out_path}')
+            return out_path
+
+        # 2) Otherwise, handle adaptive (separate video and audio) streams: download best <=1080p video and best audio, then merge via ffmpeg
+        video_candidates = [s for s in streams if getattr(s, 'type', None) == 'video'] if streams else []
+        audio_candidates = [s for s in streams if getattr(s, 'type', None) == 'audio'] if streams else []
+
+        if not video_candidates:
+            print('No video streams found for this video.')
+            return False
+
+        # choose highest video resolution <=1080
+        video_choice = None
+        try:
+            video_choice = max(filter(lambda s: res_int(s) <= 1080, video_candidates), key=res_int)
+        except Exception:
+            # fallback: highest available
+            video_choice = max(video_candidates, key=res_int)
+
+        if not audio_candidates:
+            print('No audio streams found — downloading video-only stream (may not be playable).')
+            out_path = os.path.join(out_dir, file_name)
+            video_choice.download(output_path=out_dir, filename=file_name)
+            return out_path
+
+        # pick best audio by abr if available
+        def abr_int(s):
+            abr = getattr(s, 'abr', None) or getattr(s, 'bitrate', None) or '0'
+            try:
+                return int(str(abr).replace('kbps', '').strip())
+            except Exception:
+                return 0
+
+        audio_choice = max(audio_candidates, key=abr_int)
+
+        # Download temp files
+        import uuid, subprocess
+        tmp_vid_name = f'.tmp_vid_{uuid.uuid4().hex}'
+        tmp_aud_name = f'.tmp_aud_{uuid.uuid4().hex}'
+        tmp_vid_path = os.path.join(out_dir, tmp_vid_name)
+        tmp_aud_path = os.path.join(out_dir, tmp_aud_name)
+
+        print(f'Downloading video stream ({getattr(video_choice, "resolution", "?")})...')
+        video_choice.download(output_path=out_dir, filename=tmp_vid_name)
+        print('Downloading audio stream...')
+        audio_choice.download(output_path=out_dir, filename=tmp_aud_name)
+
+        output_path = os.path.join(out_dir, file_name)
+        print('Done downloading. Now merge streams with ffmpeg...')
+        # Merge with ffmpeg: try to copy video and encode audio to AAC; fallback to re-encode video if necessary
+        ffmpeg_cmd = ['ffmpeg', '-y', '-i', tmp_vid_path, '-i', tmp_aud_path, '-c:v', 'copy', '-c:a', 'aac', output_path]
+        try:
+            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print(f'Merged file created: {output_path}')
+        except subprocess.CalledProcessError as e:
+            print('ffmpeg copy merge failed, retrying with video re-encode (slower).')
+            ffmpeg_cmd2 = ['ffmpeg', '-y', '-i', tmp_vid_path, '-i', tmp_aud_path, '-c:v', 'libx264', '-crf', '18', '-preset', 'fast', '-c:a', 'aac', output_path]
+            try:
+                subprocess.run(ffmpeg_cmd2, check=True)
+                print(f'Merged and re-encoded file created: {output_path}')
+            except subprocess.CalledProcessError as e2:
+                print('ffmpeg failed to merge streams:', e2)
+                # Cleanup temp files
+                '''try:
+                    os.remove(tmp_vid_path)
+                except Exception:
+                    pass
+                try:
+                    os.remove(tmp_aud_path)
+                except Exception:
+                    pass'''
+                return False
+
+        # cleanup temp files
+        '''try:
+            os.remove(tmp_vid_path)
+        except Exception:
+            pass
+        try:
+            os.remove(tmp_aud_path)
+        except Exception:
+            pass'''
+
+        return output_path
     except Exception as e:
         print(f'An error occurred: {e}')
-    
-    return True
-
-def clip_video(input_file, start_time, end_time, output_file):
-    try:
-        with VideoFileClip(input_file) as video:
-            # Get the subclip
-            clip = video.subclipped(start_time, end_time)
-            # Write the result to a file
-            clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
-        print(f"Successfully created clip: {output_file}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-def extract_periodic_frame(video_path, output_folder, interval_seconds=5):
-    """
-    Extracts a specific frame from a video and saves it as a high-resolution image.
-
-    Args:
-        video_path (str): Path to the input video file.
-        frame_number (int): The index of the frame to extract (0-based).
-        output_path (str): Path to save the output image file (e.g., 'snapshot.png').
-    """
-    # Open the video file
-    vidcap = cv2.VideoCapture(video_path)
-    
-    # Check if video opened successfully
-    if not vidcap.isOpened():
-        print("Error: Could not open video file.")
-        return
-
-    fps = vidcap.get(cv2.CAP_PROP_FPS)
-    interval_frames = int(fps * interval_seconds)
-
-    os.makedirs(output_folder, exist_ok=True)
-    frame_count = 0
-    saved_count = 0
-
-    while True:
-        ret, frame = vidcap.read()
-        if not ret:
-            break
-
-        if frame_count % interval_frames == 0:
-            timestamp = int(frame_count / fps)
-            filename = os.path.join(output_folder, f'snapshot_{timestamp}s.png')
-            cv2.imwrite(filename, frame)
-            saved_count += 1
-            print(f"Saved snapshot at {timestamp}s to {filename}")
-        
-        frame_count += 1
-    vidcap.release()
-    print(f"Done. Extracted {saved_count} snapshots.")
+        return False
 
 # Example usage:
 #video_file = 'input_videos/test_full_game_1080p.mp4' 
