@@ -8,12 +8,19 @@ pip install:
 - python-dotenv
 - opencv-python
 - pandas
+- moviepy
 - ...
+
+Smart App Control policy blocking video download??
 
 Set up .env file with YouTube API key:
 Create a .env file in the same directory as main.py. Create YouTube API Key (link?) through the Google Cloud Console. Copy key from APIs and Services -> Credentials paste it into this line to add to the .env file: YOUTUBE_API_KEY="<paste-key-here>"
 
 How to setup youtube token?
+PO Token:
+https://pytubefix.readthedocs.io/en/latest/user/po_token.html
+https://github.com/YunzheZJU/youtube-po-token-generator
+
 gcloud auth?
 
 Need a YouTube API Key and .env file setup
