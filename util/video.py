@@ -1,13 +1,17 @@
 import cv2
 from moviepy import VideoFileClip
+import os
 
-def clip_video(input_file, start_time, end_time, output_file):
+def clip_video(input_file, start_time, end_time):
+    work_dir = os.path.split(input_file)[0]
+    output_file = input_file.rsplit('.', 1)[0] + f'_{start_time}_{end_time}.mp4'
+    output_path = os.path.join(work_dir, output_file)
     try:
         with VideoFileClip(input_file) as video:
             # Get the subclip
             clip = video.subclipped(start_time, end_time)
             # Write the result to a file
-            clip.write_videofile(output_file, codec="libx264", audio_codec="aac")
+            clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
         print(f"Successfully created clip: {output_file}")
     except Exception as e:
         print(f"An error occurred: {e}")
